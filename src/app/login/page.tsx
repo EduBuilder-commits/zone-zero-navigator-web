@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Shield, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Shield, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { signIn, signInWithGoogle } from '@/lib/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,26 +14,44 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    // Check if already logged in
+    const checkAuth = async () => {
+      const { supabase } = await import('@/lib/auth')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        router.push('/dashboard')
+      }
+    }
+    checkAuth()
+  }, [router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Demo login - in production this would call Supabase Auth
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (email && password) {
+    try {
+      await signIn(email, password)
       router.push('/dashboard')
-    } else {
-      setError('Please enter email and password')
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
-  const handleGoogleLogin = () => {
-    // In production: Supabase Google OAuth
-    router.push('/dashboard')
+  const handleGoogleLogin = async () => {
+    setLoading(true)
+    setError('')
+    
+    try {
+      await signInWithGoogle()
+      // Redirect will happen automatically
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in with Google')
+      setLoading(false)
+    }
   }
 
   return (
@@ -67,7 +86,8 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl10 pr4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -81,7 +101,8 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl10 pr12 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl-10 pr-12 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
@@ -98,7 +119,9 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-white/20 bg-slate-900 text-emerald-500 focus:ring-emerald-500" />
                 <span className="ml-2 text-sm text-slate-400">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-emerald-400 hover:text-emerald-300">Forgot password?</a>
+              <Link href="/forgot-password" className="text-sm text-emerald-400 hover:text-emerald-300">
+                Forgot password?
+              </Link>
             </div>
 
             <button
@@ -107,7 +130,7 @@ export default function LoginPage() {
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
                   Sign In
@@ -128,7 +151,8 @@ export default function LoginPage() {
 
           <button
             onClick={handleGoogleLogin}
-            className="w-full bg-white hover:bg-gray-100 text-slate-900 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition"
+            disabled={loading}
+            className="w-full bg-white hover:bg-gray-100 text-slate-900 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

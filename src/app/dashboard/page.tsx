@@ -1,18 +1,52 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { 
   Shield, Upload, Camera, FileText, CheckCircle, AlertTriangle, 
-  Home, Menu, X, ChevronRight, ArrowLeft, Trash2, Download, Share2
+  Home, Menu, X, ArrowLeft, Trash2, Download, Share2, LogOut, Loader2, History
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { signOut, getCurrentUser } from '@/lib/auth'
+import { downloadReport } from '@/lib/pdfGenerator'
 
 // Dashboard Page
 export default function DashboardPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [photos, setPhotos] = useState<string[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [report, setReport] = useState<any>(null)
+  const [propertyAddress, setPropertyAddress] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [savingReport, setSavingReport] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    checkAuth()
+  }, [])
+
+  const checkAuth = async () => {
+    try {
+      const currentUser = await getCurrentUser()
+      if (!currentUser) {
+        router.push('/login')
+        return
+      }
+      setUser(currentUser)
+    } catch (err) {
+      console.error('Auth error:', err)
+      router.push('/login')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/')
+  }
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -38,29 +72,55 @@ export default function DashboardPage() {
     
     setAnalyzing(true)
     
-    // Simulate AI analysis - in production this calls the API
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photos,
+          address: propertyAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Analysis failed')
+      }
+
+      const result = await response.json()
+      setReport({
+        ...result,
+        propertyAddress,
+        timestamp: new Date().toISOString(),
+        images: photos
+      })
+    } catch (err) {
+      console.error('Analysis error:', err)
+      alert('Failed to analyze photos. Please try again.')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleDownloadPDF = () => {
+    if (!report) return
+    setSavingReport(true)
     
-    setReport({
-      score: 72,
-      status: 'partial',
-      issues: [
-        { type: 'violation', message: 'Mulch within 5ft of structure', severity: 'high' },
-        { type: 'warning', message: 'Dead vegetation near fence', severity: 'medium' },
-      ],
-      recommendations: [
-        'Remove all combustible materials from 5ft zone',
-        'Replace wood mulch with gravel within 5ft',
-        'Trim dead branches within 10ft of structure',
-      ],
-      compliantItems: [
-        'No dead trees near structure',
-        'Clear gutters',
-        'No storage against exterior wall',
-      ]
-    })
-    
-    setAnalyzing(false)
+    try {
+      downloadReport(report, `compliance-report-${new Date().toISOString().split('T')[0]}`)
+    } catch (err) {
+      console.error('PDF download error:', err)
+      alert('Failed to download PDF')
+    } finally {
+      setSavingReport(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+      </div>
+    )
   }
 
   return (
@@ -69,25 +129,62 @@ export default function DashboardPage() {
       <header className="bg-slate-800 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center gap-4">
               <Link href="/" className="flex items-center text-white hover:text-emerald-400 transition">
                 <ArrowLeft className="w-5 h-5 mr-2" />
                 Back
               </Link>
+              <h1 className="text-xl font-bold text-white hidden sm:block">Zone Zero Navigator</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-slate-400">Free Plan</span>
-              <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">
-                M
-              </div>
+              <button 
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="text-white hover:text-emerald-400"
+              >
+                {menuOpen ? <X /> : <Menu />}
+              </button>
             </div>
           </div>
         </div>
+        
+        {/* Mobile Menu */}
+        {menuOpen && (
+          <div className="bg-slate-800 border-t border-white/10 px-4 py-4 space-y-3">
+            <div className="flex items-center gap-3 text-white">
+              <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center font-bold">
+                {user?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <div>
+                <div className="font-medium">{user?.email}</div>
+                <div className="text-sm text-slate-400">Free Plan</div>
+              </div>
+            </div>
+            <button 
+              onClick={handleSignOut}
+              className="flex items-center gap-2 text-white hover:text-emerald-400 w-full"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {!report ? (
           <>
+            {/* Property Address */}
+            <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-6 mb-8">
+              <label className="block text-sm font-medium text-white mb-2">Property Address</label>
+              <input
+                type="text"
+                value={propertyAddress}
+                onChange={(e) => setPropertyAddress(e.target.value)}
+                placeholder="123 Main St, San Diego, CA"
+                className="w-full bg-slate-900 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
             {/* Photo Upload Section */}
             <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-8 mb-8">
               <h1 className="text-2xl font-bold text-white mb-2">Scan Your Property</h1>
@@ -145,7 +242,7 @@ export default function DashboardPage() {
                 >
                   {analyzing ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Analyzing...
                     </>
                   ) : (
@@ -176,8 +273,16 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-white">Compliance Report</h1>
                 <div className="flex gap-2">
-                  <button className="bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 flex items-center gap-2">
-                    <Download className="w-4 h-4" />
+                  <button 
+                    onClick={handleDownloadPDF}
+                    disabled={savingReport}
+                    className="bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {savingReport ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
                     PDF
                   </button>
                   <button className="bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 flex items-center gap-2">
@@ -187,10 +292,18 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Property Info */}
+              {report.propertyAddress && (
+                <div className="mb-6 p-4 bg-slate-700/50 rounded-lg">
+                  <div className="text-sm text-slate-400">Property</div>
+                  <div className="text-white font-medium">{report.propertyAddress}</div>
+                </div>
+              )}
+
               {/* Score */}
               <div className="flex items-center gap-6 mb-8">
-                <div className={`text-5xl font-bold ${report.score >= 70 ? 'text-emerald-400' : report.score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {report.score}
+                <div className={`text-5xl font-bold ${report.overallScore >= 70 ? 'text-emerald-400' : report.overallScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {report.overallScore}
                 </div>
                 <div>
                   <div className="text-xl font-semibold text-white">
@@ -201,7 +314,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Issues */}
-              {report.issues.length > 0 && (
+              {report.issues && report.issues.length > 0 && (
                 <div className="mb-6">
                   <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-yellow-400" />
@@ -221,7 +334,7 @@ export default function DashboardPage() {
               )}
 
               {/* Compliant Items */}
-              {report.compliantItems.length > 0 && (
+              {report.compliantItems && report.compliantItems.length > 0 && (
                 <div className="mb-6">
                   <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-emerald-400" />
@@ -239,20 +352,22 @@ export default function DashboardPage() {
               )}
 
               {/* Recommendations */}
-              <div>
-                <h3 className="font-semibold text-white mb-3">Recommended Actions</h3>
-                <div className="space-y-2">
-                  {report.recommendations.map((rec: string, i: number) => (
-                    <div key={i} className="p-3 bg-slate-700/50 rounded-lg text-slate-300">
-                      {i + 1}. {rec}
-                    </div>
-                  ))}
+              {report.recommendations && report.recommendations.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-white mb-3">Recommended Actions</h3>
+                  <div className="space-y-2">
+                    {report.recommendations.map((rec: string, i: number) => (
+                      <div key={i} className="p-3 bg-slate-700/50 rounded-lg text-slate-300">
+                        {i + 1}. {rec}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <button
-              onClick={() => { setReport(null); setPhotos([]) }}
+              onClick={() => { setReport(null); setPhotos([]); setPropertyAddress('') }}
               className="w-full border border-white/20 text-white py-3 rounded-lg hover:bg-white/10 transition"
             >
               Start New Scan

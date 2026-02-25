@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Shield, Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Shield, Mail, Lock, Eye, EyeOff, ArrowRight, User, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { signUp, signInWithGoogle } from '@/lib/auth'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -13,26 +14,65 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    // Check if already logged in
+    const checkAuth = async () => {
+      const { supabase } = await import('@/lib/auth')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        router.push('/dashboard')
+      }
+    }
+    checkAuth()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Demo signup - in production this would call Supabase Auth
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (email && password && name) {
-      router.push('/dashboard')
-    } else {
-      setError('Please fill in all fields')
+    try {
+      await signUp(email, password, name)
+      setSuccess(true)
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
-  const handleGoogleSignup = () => {
-    router.push('/dashboard')
+  const handleGoogleSignup = async () => {
+    setLoading(true)
+    setError('')
+    
+    try {
+      await signInWithGoogle()
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up with Google')
+      setLoading(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail className="w-8 h-8 text-emerald-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Check your email!</h2>
+          <p className="text-slate-400 mb-6">
+            We sent a confirmation link to <strong className="text-white">{email}</strong>.
+            Click the link to activate your account.
+          </p>
+          <Link href="/login" className="text-emerald-400 hover:text-emerald-300">
+            Back to Sign In
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -67,7 +107,8 @@ export default function SignupPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Smith"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl10 pr4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -81,7 +122,8 @@ export default function SignupPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl10 pr4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -89,13 +131,15 @@ export default function SignupPage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-5 00" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl10 pr12 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  minLength={8}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg pl-10 pr-12 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
@@ -117,7 +161,7 @@ export default function SignupPage() {
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
                   Create Account
@@ -138,7 +182,8 @@ export default function SignupPage() {
 
           <button
             onClick={handleGoogleSignup}
-            className="w-full bg-white hover:bg-gray-100 text-slate-900 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition"
+            disabled={loading}
+            className="w-full bg-white hover:bg-gray-100 text-slate-900 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
