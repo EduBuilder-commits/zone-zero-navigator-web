@@ -29,6 +29,7 @@ export default function DashboardPage() {
 
   const checkAuth = async () => {
     try {
+      const { getCurrentUser } = await import('@/lib/auth')
       const currentUser = await getCurrentUser()
       if (!currentUser) {
         router.push('/login')

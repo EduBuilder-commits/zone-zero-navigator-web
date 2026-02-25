@@ -20,6 +20,8 @@ export default function SignupPage() {
     // Check if already logged in
     const checkAuth = async () => {
       const { supabase } = await import('@/lib/auth')
+      if (!supabase) return // Demo mode
+      
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         router.push('/dashboard')
