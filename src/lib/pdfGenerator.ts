@@ -70,8 +70,14 @@ export function generateComplianceReport(data: ReportData): jsPDF {
   yPos += 10
 
   // Score circle
-  const scoreColor = data.overallScore >= 70 ? [22, 163, 74] : data.overallScore >= 50 ? [234, 179, 8] : [220, 38, 38]
-  doc.setFillColor(...scoreColor)
+  const score = data.overallScore
+  if (score >= 70) {
+    doc.setFillColor(22, 163, 74) // green
+  } else if (score >= 50) {
+    doc.setFillColor(234, 179, 8) // yellow
+  } else {
+    doc.setFillColor(220, 38, 38) // red
+  }
   doc.circle(35, yPos, 15, 'F')
   
   doc.setTextColor(255, 255, 255)
