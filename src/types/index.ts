@@ -22,6 +22,52 @@ export type InsurabilityTier =
   | 'HIGH_RISK'      // Score 7-8: FAIR Plan likely
   | 'UNINSURABLE';   // Score 9-10: FAIR Plan only
 
+// Plant Database Entry
+export interface PlantInfo {
+  name: string;
+  scientificName?: string;
+  category: 'Red List' | 'Green List';
+  reason: string;
+  substitutes?: string[];
+}
+
+// User (Supabase Auth)
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+  subscription_tier: 'free' | 'premium';
+  subscription_expires_at?: string;
+}
+
+// Property (for multi-property tracking)
+export interface Property {
+  id: string;
+  user_id: string;
+  address: string;
+  jurisdiction: JurisdictionMode;
+  created_at: string;
+  last_audit_at?: string;
+}
+
+// Report History Entry
+export interface ReportHistoryEntry {
+  id: string;
+  property_id: string;
+  report: ComplianceReport;
+  created_at: string;
+  pdf_url?: string; // Supabase storage URL
+}
+
+// Email Send Record
+export interface EmailRecord {
+  id: string;
+  report_id: string;
+  recipient_email: string;
+  sent_at: string;
+  status: 'sent' | 'failed' | 'pending';
+}
+
 // Fire Hazard Data (GIS/Location Info)
 export interface FireHazardData {
   fhsZ_classification: 'VHFHSZ' | 'HFHSZ' | 'MFHSZ' | 'NON-WUI';
