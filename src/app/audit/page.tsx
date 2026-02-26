@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { 
   Shield, Camera, Loader2, ChevronLeft, ChevronRight, Check,
-  MapPin, Building2, Home, ArrowRight, X, RefreshCw
+  MapPin, Building2, Home, ArrowRight, X, RefreshCw, Upload
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -293,13 +293,27 @@ export default function AuditScannerPage() {
                       </div>
                     </>
                   ) : (
-                    <button
-                      onClick={() => startCamera(photo.id)}
-                      className="w-full h-full flex flex-col items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition"
-                    >
-                      <Camera className="w-8 h-8 mb-2" />
-                      <span className="text-sm">{photo.label}</span>
-                    </button>
+                    <div className="w-full h-full flex flex-col">
+                      <div className="flex-1 flex items-center justify-center text-slate-500 text-sm font-medium">
+                        {photo.label}
+                      </div>
+                      <div className="flex border-t border-white/10">
+                        <button
+                          onClick={() => startCamera(photo.id)}
+                          className="flex-1 py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 transition border-r border-white/10"
+                        >
+                          <Camera className="w-5 h-5 mb-1" />
+                          <span className="text-xs">Take Photo</span>
+                        </button>
+                        <label
+                          htmlFor={`file-${index}`}
+                          className="flex-1 py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 transition cursor-pointer"
+                        >
+                          <Upload className="w-5 h-5 mb-1" />
+                          <span className="text-xs">Upload</span>
+                        </label>
+                      </div>
+                    </div>
                   )}
                   <input
                     type="file"
@@ -313,7 +327,7 @@ export default function AuditScannerPage() {
             </div>
             
             <p className="text-sm text-slate-400 text-center">
-              Tap a box to capture or upload a photo
+              Use 📷 to take a photo or ⬆️ to upload from your device
             </p>
             
             {error && (
