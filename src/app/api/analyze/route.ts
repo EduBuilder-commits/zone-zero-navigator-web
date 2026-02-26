@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Analyze photos for compliance using Google Gemini
+// Analyze photos for compliance using Anthropic Claude
 export async function POST(request: NextRequest) {
   try {
     const { photos, address, jurisdiction } = await request.json()
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
     
     if (!apiKey) {
       return NextResponse.json(
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build the prompt for compliance analysis (from blueprint)
+    // Build the prompt for compliance analysis
     const prompt = `You are "The Pocket Fire Marshal V4," a dual-perspective expert AI for California wildfire defensible space compliance.
 
 ## ANALYSIS PROTOCOL
@@ -85,37 +85,37 @@ Analyze these photos and provide a JSON response with:
   ]
 }`
 
-    // Call Google Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              ...photos.map((photo: string) => ({
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: photo.split(',')[1] // Remove data:image/jpeg;base64, prefix
-                }
-              }))
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 4096,
-          }
-        })
-      }
-    )
+    // Call Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            ...photos.map((photo: string) => ({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: photo.split(',')[1]
+              }
+            }))
+          ]
+        }]
+      })
+    })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Gemini API error:', errorData)
+      const errorData = await response.text()
+      console.error('Anthropic API error:', errorData)
       return NextResponse.json(
         { error: 'AI analysis failed', details: errorData },
         { status: 500 }
@@ -124,11 +124,11 @@ Analyze these photos and provide a JSON response with:
 
     const result = await response.json()
     
-    // Parse the JSON response from Gemini
+    // Parse the JSON response from Claude
     let analysisResult
     try {
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-      // Extract JSON from response (in case it's wrapped in markdown)
+      const text = result.content?.[0]?.text || '{}'
+      // Extract JSON from response
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       analysisResult = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
     } catch (parseError) {
